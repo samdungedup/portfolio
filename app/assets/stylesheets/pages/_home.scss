@@ -23,8 +23,7 @@ section:nth-child(2) {
   display: flex;
   margin: 0px auto;
   max-width: 1200px;
-
-    }
+}
 
 .left-half {
   flex: 2;
@@ -75,4 +74,12 @@ a:hover {
   h2 {
     font-size: 20px;
   }
+}
+
+.full-stack {
+  margin-left: 180px;
+}
+
+.microsoft {
+  margin-right: 180px;
 }

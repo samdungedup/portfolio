@@ -19,6 +19,11 @@ section:nth-child(2) {
   color: white;
 }
 
+section:nth-child(4) {
+  background: $background-dark-color;
+  color: white;
+}
+
 .container-home {
   display: flex;
   margin: 0px auto;

@@ -18,13 +18,12 @@
 # performance.
 
 ARG RUBY_VERSION=3.1.2
+ARG NODE_VERSION=16.15.1
 ARG VARIANT=jemalloc-slim
 FROM quay.io/evl.ms/fullstaq-ruby:${RUBY_VERSION}-${VARIANT} as base
 
 LABEL fly_launch_runtime="rails"
 
-ARG NODE_VERSION=16.15.1
-ARG YARN_VERSION=1.22.19
 ARG BUNDLER_VERSION=2.3.25
 
 ARG RAILS_ENV=production
@@ -42,11 +41,17 @@ RUN mkdir /app
 WORKDIR /app
 RUN mkdir -p tmp/pids
 
+SHELL ["/bin/bash", "-c"]
+
 RUN curl https://get.volta.sh | bash
+
+ENV BASH_ENV ~/.bashrc
 ENV VOLTA_HOME /root/.volta
 ENV PATH $VOLTA_HOME/bin:/usr/local/bin:$PATH
-RUN volta install node@${NODE_VERSION} yarn@${YARN_VERSION} && \
-    gem update --system --no-document && \
+
+RUN volta install node@16.15.1 && volta install yarn
+
+RUN gem update --system --no-document && \
     gem install -N bundler -v ${BUNDLER_VERSION}
 
 #######################################################################
@@ -55,7 +60,7 @@ RUN volta install node@${NODE_VERSION} yarn@${YARN_VERSION} && \
 
 FROM base as build_deps
 
-ARG BUILD_PACKAGES="git build-essential libpq-dev wget vim curl gzip xz-utils libsqlite3-dev"
+ARG BUILD_PACKAGES="git build-essential libpq-dev wget vim curl gzip xz-utils libsqlite3-dev nodejs yarn"
 ENV BUILD_PACKAGES ${BUILD_PACKAGES}
 
 RUN --mount=type=cache,id=dev-apt-cache,sharing=locked,target=/var/cache/apt \
@@ -71,25 +76,28 @@ RUN --mount=type=cache,id=dev-apt-cache,sharing=locked,target=/var/cache/apt \
 FROM build_deps as gems
 
 COPY Gemfile* ./
-RUN bundle install && rm -rf vendor/bundle/ruby/*/cache
+RUN bundle install &&  rm -rf vendor/bundle/ruby/*/cache
 
 #######################################################################
-
-# install node modules
 
 FROM build_deps as node_modules
 
 COPY package*json ./
 COPY yarn.* ./
-RUN yarn install
 
-#######################################################################
+RUN if [ -f "yarn.lock" ]; then \
+    yarn install; \
+    elif [ -f "package-lock.json" ]; then \
+    npm install; \
+    else \
+    mkdir node_modules; \
+    fi
 
 # install deployment packages
 
 FROM base
 
-ARG DEPLOY_PACKAGES="postgresql-client file vim curl gzip libsqlite3-0"
+ARG DEPLOY_PACKAGES="postgresql-client file vim curl gzip libsqlite3-0 nodejs yarn"
 ENV DEPLOY_PACKAGES=${DEPLOY_PACKAGES}
 
 RUN --mount=type=cache,id=prod-apt-cache,sharing=locked,target=/var/cache/apt \
@@ -103,8 +111,6 @@ RUN --mount=type=cache,id=prod-apt-cache,sharing=locked,target=/var/cache/apt \
 COPY --from=gems /app /app
 COPY --from=gems /usr/lib/fullstaq-ruby/versions /usr/lib/fullstaq-ruby/versions
 COPY --from=gems /usr/local/bundle /usr/local/bundle
-
-# copy installed node modules
 COPY --from=node_modules /app/node_modules /app/node_modules
 
 #######################################################################
@@ -114,7 +120,7 @@ COPY . .
 
 # Adjust binstubs to run on Linux and set current working directory
 RUN chmod +x /app/bin/* && \
-    sed -i 's/ruby.exe\r*/ruby/' /app/bin/* && \
+    sed -i 's/ruby.exe/ruby/' /app/bin/* && \
     sed -i '/^#!/aDir.chdir File.expand_path("..", __dir__)' /app/bin/*
 
 # The following enable assets to precompile on the build server.  Adjust

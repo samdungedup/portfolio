@@ -9,15 +9,3 @@
 .skills-cards {
   background: linear-gradient(to top, $background-color 50%, $background-dark-color 50%  );
 }
-
-@media(max-width: 992px) {
-  .skills-cards {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media(max-width: 768px) {
-  .skills-cards {
-    grid-template-columns: 1fr;
-  }
-}
